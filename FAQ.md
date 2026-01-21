@@ -1,5 +1,256 @@
 # Frequently Asked Questions
 
+## Should I build a POC first to validate the native SDK solves my connectivity issues?
+
+**Question:** Before committing to building a custom native app and migrating all users, should I first validate that the native SDK actually solves our intermittent connectivity issues?
+
+**Answer:** **YES, absolutely!** This is the correct risk management approach.
+
+### Why POC First?
+
+Before committing to a 3-4 month development effort to build a custom native app (based on UIKitMIAW.swift), you should validate your hypothesis:
+
+**Hypothesis to Test:**
+> "The native Messaging SDK solves our intermittent connectivity and session loss issues better than the web-based approach."
+
+**If native SDK DOESN'T solve the problem** → Don't build the custom app
+**If native SDK DOES solve the problem** → You have a clear business case to proceed
+
+### Quick POC Validation (2-4 Weeks)
+
+#### Week 1: Setup & Initial Testing
+
+**Minimal Configuration Steps:**
+
+1. **Open the sample project**
+   ```bash
+   cd messaging-in-app-ios
+   open MessagingExample.xcworkspace
+   ```
+
+2. **Configure UIKitMIAW.swift**
+   - File: `examples/MessagingUIExample/Views/UIKitMIAW.swift`
+   - Line 69: Replace demo URL with your Experience Cloud URL
+   - Example: `guard let url = URL(string: "https://your-experience-cloud.force.com") else { ... }`
+
+3. **Configure Salesforce credentials**
+   - File: `examples/MessagingUIExample/configFile.json`
+   ```json
+   {
+       "OrganizationId": "YOUR_ORG_ID",
+       "DeveloperName": "YOUR_DEPLOYMENT_NAME",
+       "Url": "https://YOUR_ORG.salesforce-scrt.com"
+   }
+   ```
+
+4. **Set Passthrough authentication**
+   - Run app in simulator
+   - Open Settings menu
+   - Set "Authorization Method" to "Passthrough"
+   - Login with Salesforce credentials
+
+5. **Document current web behavior**
+   - Test same scenarios in your mobile publisher app
+   - Document exactly what happens during network issues
+   - Establish baseline for comparison
+
+#### Week 2: Network Resilience Testing
+
+**Critical Test Scenarios:**
+
+| Scenario | How to Test | Expected (Native) | Current (Web) |
+|----------|-------------|-------------------|---------------|
+| **Network drop during chat** | Enable Airplane mode mid-conversation | Session persists, messages queue | Session lost? |
+| **Network reconnection** | Disable Airplane mode | Queued messages send, conversation continues | New session? |
+| **App force quit** | Force quit app, reopen | Same conversation loads | Session lost? |
+| **App background** | Background 5+ minutes, then foreground | Conversation intact | Timeout? |
+| **Weak connectivity** | Network Link Conditioner: 3G/Edge | Handles gracefully | Errors/timeouts? |
+| **Complete offline** | Turn off WiFi and cellular | Clear offline state, auto-retry | Unclear state? |
+
+**Testing Tools:**
+- **Airplane mode** - Quick on/off network testing
+- **Network Link Conditioner** - Xcode → Settings → Network Link Conditioner
+  - Simulates: 3G, Edge, Very Bad Network, 100% Loss
+- **Charles Proxy** - Monitor network traffic and latency
+- **Xcode Console** - Watch for reconnection logs in SMIClientCore
+
+**What to Monitor:**
+```
+Settings → Logging → Enable Core Logging
+Settings → Logging → Enable UI Logging
+
+// Watch for in console:
+- "SSE connection established"
+- "SSE connection lost"
+- "Reconnecting..."
+- ConversationUUID persistence
+```
+
+#### Week 3: Measure Success Criteria
+
+**Critical Metrics:**
+
+✅ **Session Persistence**
+- [ ] Conversation UUID persists across network drops
+- [ ] Messages stay in history after reconnection
+- [ ] Users can resume conversations after app restart
+- [ ] Same conversation continues after force quit
+
+✅ **Message Delivery**
+- [ ] Messages sent during connectivity loss deliver when network returns
+- [ ] No duplicate messages
+- [ ] Message order preserved
+- [ ] Typing indicators work correctly
+
+✅ **User Experience**
+- [ ] Connection status clearly visible (MessagingSessionWidget)
+- [ ] Error messages helpful and actionable
+- [ ] Reconnection happens automatically
+- [ ] No crashes or freezes during network transitions
+
+✅ **Performance**
+- [ ] Reconnection time < 5 seconds
+- [ ] App handles poor network gracefully
+- [ ] UI remains responsive during reconnection
+- [ ] Battery impact acceptable
+
+**Quantify the Improvement:**
+- Current web app: X% of sessions lost during network issues
+- Native SDK: Y% of sessions persisted
+- **Is the improvement significant enough to justify the investment?**
+
+#### Week 4: User Validation (Highly Recommended)
+
+**Real-World Testing:**
+
+1. **Identify test users**
+   - 5-10 users who currently experience connectivity issues
+   - Mix of network conditions (WiFi, cellular, poor coverage areas)
+
+2. **Deploy TestFlight build**
+   - Build UIKitMIAW.swift POC
+   - Distribute via TestFlight
+   - Provide clear testing instructions
+
+3. **Gather feedback**
+   - Survey questions:
+     - "Did you experience session loss?"
+     - "Did messages deliver reliably?"
+     - "How was the reconnection experience?"
+     - "Is this better than the current app?"
+
+4. **Measure actual improvement**
+   - User satisfaction scores
+   - Reported session loss incidents
+   - Message delivery failures
+   - Support ticket reduction
+
+### Decision Gates After POC
+
+#### ✅ If Native SDK Solves the Problem
+
+**You Have Proof:**
+- Native SDK handles connectivity measurably better
+- Users confirm improved experience
+- Session persistence works as expected
+- Clear business case for custom app development
+
+**Next Steps:**
+1. Present POC results to stakeholders
+2. Get approval for 3-4 month custom app development
+3. Plan user migration strategy
+4. Estimate full feature parity requirements (push notifications, etc.)
+5. Begin full development based on UIKitMIAW.swift template
+
+**Expected Timeline:**
+- POC: 2-4 weeks (completed)
+- Full Development: 3-4 months (from FAQ Option 1)
+- **Total: ~4-5 months to production**
+
+**Cost-Benefit Analysis:**
+- Development cost: [X months of iOS developer time]
+- User migration effort: [Communication, support, training]
+- Ongoing maintenance: [Native app updates, App Store management]
+- **vs.**
+- Cost of current connectivity issues: [Support tickets, user churn, poor experience]
+
+#### ❌ If Native SDK DOESN'T Solve the Problem
+
+**Don't Proceed with Custom App** - building it won't solve your problem!
+
+**Alternative Options:**
+
+1. **Work with Salesforce**
+   - Ask about mobile publisher improvements roadmap
+   - Request enterprise support for connectivity issues
+   - Explore other Salesforce solutions
+
+2. **Improve web-based approach**
+   - Implement service workers for offline support
+   - Better session management in web chat
+   - Progressive Web App (PWA) enhancements
+
+3. **Hybrid partial solution**
+   - Deploy separate messaging app for users with issues (FAQ Option 2)
+   - Keep mobile publisher for majority of users
+   - Gradually migrate only problem users
+
+4. **Accept limitations**
+   - If issue affects only small subset of users
+   - If cost of solution exceeds cost of problem
+   - Communicate limitations clearly to users
+
+### POC Success Checklist
+
+Before proceeding to full development, ensure:
+
+- [ ] Native SDK demonstrably solves connectivity issues
+- [ ] Improvement is quantified (X% to Y% session retention)
+- [ ] Real users validate the improvement
+- [ ] Business case is clear (ROI positive)
+- [ ] Stakeholders approve full development
+- [ ] Development team is committed (3-4 months)
+- [ ] User migration plan is defined
+- [ ] Feature parity requirements are documented
+- [ ] Ongoing maintenance plan is in place
+
+### Critical Questions to Answer
+
+1. **Does native SDK solve the connectivity problem?** (Primary validation)
+2. **By how much?** (Quantify: 10% improvement? 90% improvement?)
+3. **What's the user impact?** (Real users confirm improvement)
+4. **What's the development cost?** (Time, resources, opportunity cost)
+5. **What's the migration impact?** (How many users, communication strategy)
+6. **What about feature parity?** (Push notifications, offline data, analytics, etc.)
+7. **What's the ROI?** (Development cost vs cost of connectivity issues)
+8. **What are the risks?** (App Store approval, user adoption, ongoing maintenance)
+
+### Why This Approach is Sound Risk Management
+
+✅ **Minimizes wasted effort** - 2-4 weeks vs 3-4 months
+✅ **Provides data for decisions** - Not guessing, validating
+✅ **Validates assumptions** - Does native really solve the problem?
+✅ **Creates working demo** - Show stakeholders actual solution
+✅ **Identifies unforeseen issues** - Discover problems early
+✅ **Builds confidence** - Team and stakeholders see proof
+✅ **Enables informed go/no-go** - Clear decision criteria
+
+### POC Deliverables
+
+**At end of POC, you should have:**
+
+1. **Working demo** - UIKitMIAW.swift configured for your org
+2. **Test results** - Data from all network scenarios
+3. **Comparison metrics** - Native vs web performance
+4. **User feedback** - Real users validate improvement
+5. **Decision document** - Go/no-go recommendation with justification
+6. **Cost estimate** - Full development timeline and resources
+7. **Migration plan** - How to transition users from mobile publisher
+
+**This 2-4 week investment protects you from 3-4 months of potentially unnecessary development.**
+
+---
+
 ## Which sample app should I use for handling intermittent network connectivity?
 
 **Question:** I have a mobile publisher app for advanced messaging. Users experience intermittent network connectivity issues. When connectivity is lost, active sessions are dropped, leading to a poor user experience. Even when connectivity is restored, user sessions are lost. Salesforce suggested building a native app using the provided sample code to address these connectivity issues. Which sample app is most appropriate?
