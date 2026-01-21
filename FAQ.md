@@ -131,42 +131,99 @@ MessagingUIExample already implements this pattern via `ConversationManagementSt
 
 #### Option 1: Build Custom Native App (Replace Mobile Publisher)
 
-Build a completely new native iOS app that includes both Experience Cloud content and native messaging:
+Build a completely new native iOS app that includes both Experience Cloud content and native messaging.
+
+**Good News:** The repository includes `UIKitMIAW.swift` which demonstrates **exactly this pattern** - it's a working reference implementation.
 
 ```
-New Custom Native App (built from MessagingUIExample)
-├── Native Navigation/UI Chrome
-├── Native Messaging (SMIClientUI SDK)
-└── WKWebView for Experience Cloud content
-    └── Hide web-based chat button (users use native messaging instead)
+New Custom Native App (based on UIKitMIAW.swift)
+├── WKWebView displaying Experience Cloud site
+├── Native floating button overlaid on web content
+└── Native Messaging (SMIClientUI SDK) launched from button
 ```
 
-**This means:**
-- Starting from MessagingUIExample as your foundation
-- Adding WKWebView to display your Experience Cloud site
-- Implementing navigation between native messaging and web content
-- Users download your NEW custom app (not the mobile publisher app)
-- Distributing through App Store as your own branded app
+##### How UIKitMIAW.swift Works (Your Starting Template)
+
+**Location:** `examples/MessagingUIExample/Views/UIKitMIAW.swift`
+
+This file demonstrates the complete hybrid architecture:
+
+1. **Loads Experience Cloud in WKWebView** (lines 68-79):
+   ```swift
+   let webView = WKWebView()
+   webView.load(URLRequest(url: url))
+   view = webView
+   ```
+   Your users see the full Experience Cloud site with all branding and navigation.
+
+2. **Overlays Native Chat Button** (lines 147-155):
+   ```swift
+   self.view.addSubview(floatingButton)
+   // Positioned in bottom-right corner, above web content
+   ```
+   A native iOS button sits on top of the web view, always accessible.
+
+3. **Launches Native Messaging** (lines 162-196):
+   ```swift
+   private func openChatFeed() {
+       let controller = ModalInterfaceViewController(uiConfiguration, ...)
+       self.present(controller, animated: true)
+   }
+   ```
+   Tapping the button opens the full native messaging interface.
+
+4. **Persists Conversation UUID** (line 54):
+   ```swift
+   conversationId: conversationManagementStore.conversationUUID
+   ```
+   Sessions survive network drops and app restarts.
+
+##### Implementation Steps
+
+**Phase 1: Basic Adaptation (1-2 weeks)**
+1. Copy `UIKitMIAW.swift` as your starting point
+2. Replace `demoManagementStore.demoDomain` (line 69) with your Experience Cloud URL
+3. Configure `uiConfiguration` with your Salesforce org credentials
+4. Update floating button branding/position as needed
+5. Test basic flow: web content loads, native chat launches
+
+**Phase 2: Experience Cloud Integration (2-4 weeks)**
+1. **Hide web-based chat button**: Update your Experience Cloud site CSS to hide the embedded messaging widget when viewed in-app
+   - Use user agent detection or custom URL parameter
+   - Example: `?mobile_app=true` → hide chat widget via JavaScript
+2. **Handle deep links**: If users tap links in Experience Cloud, decide navigation behavior
+3. **Share authentication**: Integrate Salesforce Mobile SDK for unified login (see line 62 for delegate setup)
+
+**Phase 3: Feature Parity (4-8 weeks)**
+1. Add push notifications for new messages
+2. Implement mobile publisher features you rely on
+3. Add native navigation chrome (if needed)
+4. Testing and refinement
+
+**Phase 4: Deployment (2-3 weeks)**
+1. App Store submission
+2. User migration communication
+3. Gradual rollout
 
 **Pros:**
-- Complete control over mobile experience
-- Native messaging solves connectivity issues
-- Can optimize UX for mobile specifically
-- Full access to iOS native features
-- Conversation persistence works correctly
+- ✅ **Working reference implementation exists** (UIKitMIAW.swift)
+- ✅ **Proven architecture** from Salesforce official samples
+- ✅ **Native messaging solves connectivity issues**
+- ✅ **Preserves full Experience Cloud functionality**
+- ✅ **Complete control over mobile experience**
+- ✅ **Conversation persistence works correctly**
 
 **Cons:**
-- **Major undertaking**: Building entire app from scratch
-- Must replicate mobile publisher functionality (push notifications, offline support, etc.)
-- Ongoing native iOS development and maintenance required
-- Users must migrate from old app to new app
-- App Store submission and approval process
-- Need native iOS development expertise
+- ❌ **Still requires building custom native app** (can't modify mobile publisher)
+- ❌ **Users must migrate** from old app to new app
+- ❌ **Coordination needed**: Hide web chat button, add native button
+- ❌ **Ongoing maintenance** of native iOS codebase
+- ❌ **App Store submission** and approval process
 
 **Development Effort:**
-- ~2-6 months depending on feature parity requirements
-- Requires iOS developers skilled in Swift/SwiftUI
-- Ongoing maintenance and updates
+- ~3-4 months for full feature parity
+- Requires iOS developers skilled in Swift/SwiftUI/UIKit
+- Much faster than generic "build from scratch" because UIKitMIAW.swift provides the exact pattern
 
 #### Option 2: Keep Mobile Publisher, Build Separate Messaging App
 
@@ -219,15 +276,21 @@ Given your constraints (no source code, connectivity issues), here's the pragmat
 #### Immediate Term: Proof of Concept (2-4 weeks)
 
 1. **Evaluate the native SDK's effectiveness**
-   - Build MessagingUIExample with your Salesforce org configuration
-   - Test with users experiencing connectivity issues
-   - Validate that native SDK actually solves the problem
-   - Measure: session persistence, reconnection behavior, user satisfaction
+   - Open `examples/MessagingUIExample/Views/UIKitMIAW.swift` in Xcode
+   - Replace the demo URL (line 69) with your Experience Cloud site URL
+   - Configure with your Salesforce org credentials (configFile.json)
+   - Run in simulator or on test device
+   - Test with users experiencing connectivity issues:
+     - Simulate network drops (Airplane mode on/off)
+     - Force quit app and reopen - verify conversation persists
+     - Measure: session persistence, reconnection behavior, user satisfaction
+   - **Key validation**: Does the native SDK actually solve your connectivity problem?
 
 2. **Calculate full replacement cost**
    - List all features in your current mobile publisher app
-   - Estimate effort to build custom native app with those features
-   - Consider: push notifications, offline data, authentication, analytics, etc.
+   - Compare with UIKitMIAW.swift capabilities
+   - Identify gaps: push notifications, offline data, authentication, analytics, etc.
+   - Estimate effort to achieve feature parity
 
 #### Decision Point
 
@@ -276,48 +339,51 @@ Before committing to either option, ask Salesforce:
 
 ### If You Proceed with Option 1 (Custom Native App)
 
-**Minimum Requirements to Replace Mobile Publisher:**
+**Starting Point:** `examples/MessagingUIExample/Views/UIKitMIAW.swift` already provides the core architecture.
 
-Starting from MessagingUIExample, you'll need to add:
+**What UIKitMIAW.swift Already Includes:**
+- ✅ WKWebView for web content (lines 68-79)
+- ✅ Native floating button overlay (lines 147-155)
+- ✅ Native messaging interface (lines 162-196)
+- ✅ Conversation persistence via ConversationManagementStore (line 54)
+- ✅ Configuration management (lines 36-60)
+- ✅ Delegate registration (line 62)
 
-1. **WKWebView integration** for Experience Cloud content
-   ```swift
-   import WebKit
+**What You Need to Add:**
 
-   struct ExperienceCloudView: UIViewRepresentable {
-       let url: URL
-       func makeUIView(context: Context) -> WKWebView { ... }
-   }
-   ```
+1. **Replace demo URL with your Experience Cloud URL**
+   - Current: `demoManagementStore.demoDomain` (line 69)
+   - Change to: Your Experience Cloud site URL
 
-2. **Navigation structure** between native and web content
-   - Tab bar or navigation controller
-   - Deep linking handling
+2. **Hide web chat button in Experience Cloud**
+   - Add JavaScript to detect mobile app
+   - Use CSS to hide embedded messaging widget
+   - Example: Check user agent or custom URL parameter
 
-3. **Authentication**
-   - Salesforce Mobile SDK integration (already in examples)
+3. **Authentication integration**
+   - Salesforce Mobile SDK (already imported in examples)
    - See: `examples/Shared/Enums/AuthorizationMethod.swift` - Passthrough option
-   - OAuth flow for Salesforce login
+   - Share auth state between web view and native messaging
 
 4. **Push notifications**
    - Register for remote notifications
    - Handle notification payloads
-   - Route to messaging or web content
+   - Route to messaging conversation
 
-5. **Feature parity with mobile publisher**
-   - Offline support (if needed)
+5. **Additional mobile publisher features** (as needed)
+   - Offline support
    - Analytics tracking
-   - App configuration/settings
-   - Whatever else your users rely on
+   - Custom navigation
+   - App-specific settings
 
-**Development Timeline (Estimated):**
-- Weeks 1-2: POC validation
-- Weeks 3-6: Core app structure + Experience Cloud integration
-- Weeks 7-10: Authentication + push notifications
-- Weeks 11-14: Feature parity + testing
-- Weeks 15-18: Beta testing + refinement
-- Weeks 19-20: App Store submission
-- **Total: ~4-5 months minimum**
+**Development Timeline (Revised with UIKitMIAW.swift):**
+- Weeks 1-2: POC validation (use UIKitMIAW.swift as-is)
+- Weeks 3-4: URL replacement, basic customization
+- Weeks 5-8: Hide web chat, authentication integration
+- Weeks 9-12: Push notifications, feature parity
+- Weeks 13-15: Testing and refinement
+- Weeks 16-17: App Store submission
+- **Total: ~3-4 months** (faster because UIKitMIAW.swift exists)
 
 ### If You Proceed with Option 2 (Separate Messaging App)
 
@@ -335,9 +401,37 @@ Starting from MessagingUIExample, you'll need to add:
 - Eventually migrate all mobile users to separate messaging app
 - Deprecate mobile publisher app when feasible
 
+### Key Insight: UIKitMIAW.swift is Your Blueprint
+
+The most important discovery is that **Salesforce already provides a working reference implementation** for the exact hybrid architecture you need:
+
+**File:** `examples/MessagingUIExample/Views/UIKitMIAW.swift`
+
+This file demonstrates:
+- Loading web content (Experience Cloud) in WKWebView
+- Overlaying a native chat button on top of web content
+- Launching native messaging that persists across connectivity issues
+- Managing conversation UUID for session continuity
+
+**This is not a theoretical approach - it's working sample code you can adapt.**
+
+Instead of building from scratch, you're adapting proven code that demonstrates the recommended pattern for combining web content with native messaging.
+
+### Summary Decision Matrix
+
+| Scenario | Recommendation |
+|----------|---------------|
+| **POC phase** | Run UIKitMIAW.swift with your Experience Cloud URL - validate it solves connectivity issues |
+| **Connectivity issues are severe/widespread** | Option 1 - Build custom app starting from UIKitMIAW.swift |
+| **Connectivity issues affect small subset** | Option 2 - Separate messaging app, or work with Salesforce on mobile publisher improvements |
+| **Unclear if native SDK helps** | Start with POC before committing resources |
+| **No iOS development resources** | Hire iOS developers or contract firm, starting point already exists (UIKitMIAW.swift) |
+
 ### Additional Resources
 
+- **Primary reference**: `examples/MessagingUIExample/Views/UIKitMIAW.swift` (the hybrid architecture blueprint)
 - [Salesforce Mobile SDK Integration](https://developer.salesforce.com/docs/atlas.en-us.mobile_sdk.meta/mobile_sdk/intro.htm)
 - Native SDK Authentication: `CLAUDE.md` - "Authentication Methods" section
 - Example passthrough auth: `examples/Shared/Delegates/Providers/PassthroughVerificationStore.swift`
 - WKWebView integration: Apple's [WKWebView documentation](https://developer.apple.com/documentation/webkit/wkwebview)
+- Conversation persistence: `examples/Shared/Settings/Models/ConversationManagement.swift`
