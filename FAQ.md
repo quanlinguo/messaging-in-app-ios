@@ -251,6 +251,376 @@ Before proceeding to full development, ensure:
 
 ---
 
+## What features from our mobile publisher app need to be replicated in the custom native app?
+
+**Question:** Our target is a native mobile app that solves connectivity issues while retaining all current functionality of our mobile publisher app. Our users are busy, customer-facing professionals who rely on the app daily. What do we need to inventory and plan for?
+
+**Answer:** Before committing to development, you must **explicitly inventory all mobile publisher features** to determine actual development scope and timeline. "Retain all functionality" can mean 3-4 months or 6-9 months depending on what your mobile publisher actually does.
+
+### Why Feature Inventory is Critical
+
+**UIKitMIAW.swift provides the foundation**, but mobile publisher apps often include features you may not consciously track:
+- Push notifications
+- Offline capabilities
+- Custom navigation structures
+- Analytics and monitoring
+- Security features
+- Preferences and settings
+
+**The POC validates IF you should build it. The feature inventory determines HOW LONG it will take.**
+
+### Step 1: Catalog Mobile Publisher Features
+
+Create a comprehensive inventory using this framework:
+
+#### Authentication & Identity
+- [ ] Salesforce OAuth login (✅ Included via Mobile SDK)
+- [ ] Single sign-on (SSO)
+- [ ] Biometric authentication (Face ID/Touch ID)
+- [ ] Session timeout/automatic refresh
+- [ ] Multi-org support
+- [ ] Remember me / auto-login
+
+#### Push Notifications
+- [ ] New message notifications
+- [ ] Custom notifications from Experience Cloud
+- [ ] Badge counts on app icon
+- [ ] Deep links from notifications (e.g., tap notification → opens conversation)
+- [ ] Notification settings/preferences
+- [ ] Silent notifications for data sync
+
+#### Offline Capabilities
+- [ ] Offline data access (cached Experience Cloud content)
+- [ ] Cached resources for faster loading
+- [ ] Sync when connectivity returns
+- [ ] Offline indicators in UI
+- [ ] Queue actions for when online
+
+#### Navigation & Branding
+- [ ] Custom navigation menus (tab bar, side menu, etc.)
+- [ ] Branded splash screen
+- [ ] Custom app icons
+- [ ] Navigation structure (tabs, hierarchy, etc.)
+- [ ] Deep linking support (URL schemes)
+- [ ] Universal links
+
+#### Web View Features
+- [ ] Multiple web views or tabs
+- [ ] Back/forward navigation
+- [ ] Pull-to-refresh
+- [ ] External link handling (open in Safari vs in-app)
+- [ ] File download support
+- [ ] File upload support
+- [ ] Cookie/session management
+- [ ] JavaScript injection
+- [ ] Custom user agent
+
+#### Analytics & Monitoring
+- [ ] Usage tracking (screen views, user actions)
+- [ ] Error reporting (crashes, exceptions)
+- [ ] Performance monitoring
+- [ ] Custom analytics events
+- [ ] Salesforce Analytics Cloud integration
+- [ ] Third-party analytics (Google Analytics, Mixpanel, etc.)
+
+#### Security
+- [ ] Certificate pinning
+- [ ] Secure storage (Keychain)
+- [ ] Screenshot prevention (sensitive screens)
+- [ ] Jailbreak/root detection
+- [ ] Data encryption
+- [ ] Compliance requirements (HIPAA, SOC2, etc.)
+
+#### User Experience
+- [ ] Multi-language support
+- [ ] Accessibility features (VoiceOver, Dynamic Type)
+- [ ] Dark mode support
+- [ ] App settings/preferences screens
+- [ ] Help/support documentation
+- [ ] Onboarding/tutorial flow
+- [ ] Search functionality
+
+#### App Management
+- [ ] App version checking
+- [ ] Forced update mechanism
+- [ ] Feature flags/remote configuration
+- [ ] A/B testing capabilities
+- [ ] Beta testing distribution (TestFlight management)
+
+#### Other Integrations
+- [ ] Third-party SDKs
+- [ ] Custom API integrations
+- [ ] Calendar integration
+- [ ] Contact integration
+- [ ] Camera/photo library access
+- [ ] Geolocation features
+
+### Step 2: Test Mobile Publisher Thoroughly
+
+**Don't rely on documentation - actually test the app:**
+
+**Scenario Testing:**
+1. **Receive a notification**
+   - What does it look like?
+   - What happens when you tap it?
+   - Where does it navigate?
+   - Are there different notification types?
+
+2. **Go completely offline**
+   - What still works?
+   - What shows error messages?
+   - Is there cached content?
+   - What happens when you go back online?
+
+3. **Background the app for 24 hours**
+   - Does it remember your state?
+   - Does it refresh data?
+   - Does it re-authenticate?
+
+4. **Tap various links in Experience Cloud**
+   - Do they open in-app?
+   - Do they open in Safari?
+   - Is there a consistent pattern?
+
+5. **Try to download/upload a file**
+   - Does it work?
+   - Where are files saved?
+   - What file types are supported?
+
+6. **Check all settings/preferences**
+   - What is configurable?
+   - What is persisted?
+   - Are there hidden features?
+
+### Step 3: What UIKitMIAW.swift Provides vs What You Must Add
+
+**✅ Already Included in UIKitMIAW.swift:**
+- WKWebView for Experience Cloud content
+- Native messaging with session persistence
+- Salesforce OAuth via Mobile SDK (Passthrough authentication)
+- Basic navigation structure
+- Conversation management
+- Network state handling
+- Conversation UUID persistence
+
+**❌ NOT Included (You Must Implement):**
+
+**High Priority (Most Apps Need These):**
+- Push notifications infrastructure
+- Deep linking from notifications
+- Custom navigation structure (tabs, menus)
+- App branding (splash screen, icons)
+- User preferences/settings UI
+- Analytics integration
+- Error tracking/monitoring
+
+**Medium Priority (Depends on Your App):**
+- Offline data handling (beyond messaging)
+- Advanced security features
+- Multi-tab or complex navigation
+- File download/upload handling
+- Custom Experience Cloud integrations
+
+**Lower Priority (Nice to Have):**
+- Advanced offline sync
+- Feature flags/A-B testing
+- Sophisticated monitoring
+- Internationalization (if not needed initially)
+
+### Step 4: Prioritize Features for MVP
+
+Create a feature matrix:
+
+| Feature | Description | Priority | Complexity | Est. Effort | Notes |
+|---------|-------------|----------|------------|-------------|-------|
+| Experience Cloud view | Display site in WKWebView | Must-have | Low | ✅ Included | UIKitMIAW.swift |
+| Native messaging | Chat with session persistence | Must-have | Low | ✅ Included | UIKitMIAW.swift |
+| Salesforce auth | OAuth login | Must-have | Low | ✅ Included | Mobile SDK |
+| Push notifications | Notify on new messages | Must-have | Medium | 2-3 weeks | APNs integration |
+| Deep linking | Notification → conversation | Must-have | Medium | 1-2 weeks | URL handling |
+| Navigation structure | Match current tab bar | Must-have | Medium | 1-2 weeks | UITabBarController |
+| App branding | Icons, splash screen | Must-have | Low | 1 week | Asset creation |
+| Settings screen | User preferences | Should-have | Low | 1 week | SwiftUI form |
+| Analytics | Track usage | Should-have | Medium | 1-2 weeks | SDK integration |
+| Offline content | Cache web pages | Nice-to-have | High | 3-4 weeks | Complex sync |
+| ... | ... | ... | ... | ... | ... |
+
+**Priority Definitions:**
+- **Must-have** - App is unusable or unacceptable without this feature
+- **Should-have** - Users will complain if missing, but app is usable
+- **Nice-to-have** - Enhancement that can wait for v2
+
+### Step 5: Validate with Users
+
+**Interview Your Actual Users:**
+
+Questions to ask busy, customer-facing professionals:
+1. "What do you use the mobile app for on a daily basis?"
+2. "What features would make the app unusable if they were missing?"
+3. "What happens when you're offline? What still needs to work?"
+4. "Do you rely on push notifications? For what scenarios?"
+5. "What makes you most productive in the current app?"
+6. "What frustrates you about the current app?"
+7. "If you had to choose 3 features to keep, what would they be?"
+
+**This tells you what REALLY matters vs theoretical requirements.**
+
+### Development Timeline Based on Feature Complexity
+
+The original "3-4 months" estimate assumes **basic feature parity**. Actual timelines:
+
+#### Minimal Feature Parity (3-4 months)
+**Includes:**
+- UIKitMIAW.swift foundation
+- Basic push notifications
+- Simple navigation matching mobile publisher
+- Basic branding
+
+**Best for:** Simple mobile publisher apps with minimal custom features
+
+#### Moderate Feature Parity (4-6 months)
+**Includes everything above, plus:**
+- Advanced push notifications with deep linking
+- Custom navigation structure (tabs, complex hierarchy)
+- Analytics integration
+- Settings/preferences UI
+- Offline handling for web content
+- Error tracking
+
+**Best for:** Typical mobile publisher apps with standard features
+
+#### Full Feature Parity (6-9 months)
+**Includes everything above, plus:**
+- Multiple web views with complex navigation
+- Extensive offline capabilities and sync
+- Advanced security features (certificate pinning, etc.)
+- Custom workflow integrations
+- Feature flags and A/B testing
+- Sophisticated monitoring and analytics
+- Advanced accessibility features
+
+**Best for:** Enterprise mobile publisher apps with extensive customization
+
+### Example: Customer-Facing Professional MVP
+
+**For busy professionals who need reliability:**
+
+**Must-Have (MVP v1.0):**
+1. ✅ Experience Cloud site access (WKWebView) - Included
+2. ✅ Native messaging with connectivity resilience - Included
+3. ✅ Salesforce login - Included
+4. ❌ Push notifications for new messages - **Add (2-3 weeks)**
+5. ❌ Deep linking: notification → conversation - **Add (1-2 weeks)**
+6. ❌ Tab navigation matching current app - **Add (1-2 weeks)**
+7. ❌ App branding (icons, splash) - **Add (1 week)**
+8. ❌ Settings for notification preferences - **Add (1 week)**
+
+**Should-Have (MVP v1.0):**
+9. ❌ Offline indicator and graceful degradation - **Add (1 week)**
+10. ❌ Analytics tracking - **Add (1-2 weeks)**
+11. ❌ Error reporting - **Add (1 week)**
+
+**Nice-to-Have (v2.0 - Post-Launch):**
+12. Advanced offline content caching
+13. Multi-language support
+14. Advanced analytics dashboards
+15. Enhanced security features
+
+**Total Estimated Development: 4-5 months** (not 3-4 months)
+
+### Updated Development Timeline with Feature Parity
+
+**Realistic Full Timeline:**
+
+#### Phase 0: Feature Inventory (1-2 weeks) ← NEW
+- Document all mobile publisher features
+- Test every feature thoroughly
+- Interview users about priorities
+- Create feature matrix with priorities
+- Get stakeholder alignment on MVP scope
+- Estimate development effort
+
+#### Phase 1: POC (2-4 weeks)
+- Validate native SDK solves connectivity
+- UIKitMIAW.swift working with your org
+- User testing confirms improvement
+
+#### Phase 2: Planning (1-2 weeks)
+- Finalize MVP feature list
+- Detailed technical design
+- Resource allocation
+- Development sprint planning
+
+#### Phase 3: MVP Development (4-6 months)
+- **Weeks 1-2**: Project setup, CI/CD, architecture
+- **Weeks 3-6**: Push notifications implementation & testing
+- **Weeks 7-10**: Navigation structure matching mobile publisher
+- **Weeks 11-14**: User preferences, settings, branding
+- **Weeks 15-18**: Analytics, error tracking, offline handling
+- **Weeks 19-22**: Integration testing, bug fixes
+- **Weeks 23-24**: Beta testing with real users
+- **Weeks 25-26**: App Store submission & review
+
+#### Phase 4: Migration (1-2 months)
+- Communication to users
+- Phased rollout strategy
+- Support and feedback monitoring
+- Deprecate mobile publisher
+
+**Total Timeline: 6-10 months from feature inventory to full migration**
+
+### Feature Parity Checklist
+
+Before committing to development timeline:
+
+- [ ] Complete feature inventory of mobile publisher app
+- [ ] Test every feature in current app
+- [ ] Interview users about feature priorities
+- [ ] Categorize features: Must-have, Should-have, Nice-to-have
+- [ ] Estimate development effort for each feature
+- [ ] Get stakeholder approval on MVP scope
+- [ ] Confirm team has capacity for estimated timeline
+- [ ] Budget accounts for actual feature complexity
+- [ ] Migration plan accounts for feature changes
+- [ ] Training plan for any UX differences
+
+### Red Flags: Features That Significantly Increase Complexity
+
+⚠️ **These features can add months to development:**
+
+1. **Complex offline data sync** - Can double development time
+2. **Multiple web views with shared state** - Complex state management
+3. **Advanced security requirements** (HIPAA, SOC2) - Extensive compliance work
+4. **Custom native features** beyond messaging - Each is mini-project
+5. **Extensive third-party integrations** - Each SDK adds complexity
+6. **Legacy compatibility** with old app versions - Migration complexity
+
+If your mobile publisher has multiple red flags, consider:
+- Phased approach (MVP with core features, then iterations)
+- Reduced scope for v1.0
+- Longer timeline (9-12 months)
+- Additional development resources
+
+### Bottom Line
+
+**For your target: "Native app that solves connectivity while retaining all current functionality"**
+
+✅ **Correct goal** - This is what users need
+⚠️ **"All current functionality" must be explicitly defined** - Determines 4-9 month timeline
+📋 **Feature inventory is not optional** - Required for accurate planning
+💰 **Budget should reflect actual complexity** - Not just basic UIKitMIAW.swift
+
+**Action Items:**
+1. **During POC** (Weeks 1-4): Validate connectivity solution
+2. **Before development** (Weeks 5-6): Complete feature inventory
+3. **Planning phase** (Weeks 7-8): Finalize MVP scope and timeline
+4. **Development** (4-6 months): Build with realistic expectations
+5. **Migration** (1-2 months): Transition users with proper support
+
+**The POC proves it works. The feature inventory proves it's feasible within your constraints.**
+
+---
+
 ## Which sample app should I use for handling intermittent network connectivity?
 
 **Question:** I have a mobile publisher app for advanced messaging. Users experience intermittent network connectivity issues. When connectivity is lost, active sessions are dropped, leading to a poor user experience. Even when connectivity is restored, user sessions are lost. Salesforce suggested building a native app using the provided sample code to address these connectivity issues. Which sample app is most appropriate?
