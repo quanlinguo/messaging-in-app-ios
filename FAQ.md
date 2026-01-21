@@ -84,6 +84,163 @@ However, for the specific problem of sessions being dropped during intermittent 
 
 ---
 
+## What is the relationship between the Messaging SDK and Salesforce Mobile SDK?
+
+**Question:** When building Salesforce mobile apps, I've always used the Salesforce Mobile SDK. When I look at this sample code, I'm unclear whether it uses the Salesforce Mobile SDK, is built on top of it, or represents a different approach altogether.
+
+**Answer:** The **Messaging for In-App SDK is a completely separate, standalone SDK** that does NOT require the Salesforce Mobile SDK to function. However, the Salesforce Mobile SDK can be used OPTIONALLY for one specific authentication method.
+
+### The Two SDKs Are Independent
+
+#### Messaging for In-App SDK (This Repository)
+- **Package**: `Swift-Package-InAppMessaging` from `https://github.com/Salesforce-Async-Messaging/Swift-Package-InAppMessaging.git`
+- **Frameworks**: `SMIClientCore` and `SMIClientUI`
+- **Purpose**: Messaging/chat functionality for customer support
+- **Operates independently**: Does NOT require Salesforce Mobile SDK
+- **Can be used in**: Any iOS app, not just Salesforce-integrated apps
+
+#### Salesforce Mobile SDK (Optional Dependency)
+- **Package**: `SalesforceMobileSDK-iOS-SPM` from `https://github.com/forcedotcom/SalesforceMobileSDK-iOS-SPM`
+- **Frameworks**: `SalesforceSDKCore`, `MobileSync`, `SalesforceAnalytics`
+- **Purpose**: Salesforce platform integration, OAuth authentication, data sync
+- **Used for**: Passthrough authentication only (in these examples)
+
+### Three Authentication Methods (Only One Uses Mobile SDK)
+
+The Messaging SDK supports three authentication approaches:
+
+**Location:** `examples/Shared/Enums/AuthorizationMethod.swift`
+
+1. **Unverified** - No authentication
+   - Simplest approach
+   - No user identity verification
+   - ✅ **No Salesforce Mobile SDK required**
+
+2. **User Verified (JWT)** - Your app provides a JWT token
+   - You implement JWT generation in your backend
+   - Pass token via `UserVerificationDelegate`
+   - ✅ **No Salesforce Mobile SDK required**
+   - **Location:** `examples/Shared/Delegates/CoreDelegate/GlobalCoreDelegateHandler+UserVerification.swift:18-19`
+
+3. **Passthrough** - Uses Salesforce Mobile SDK for authentication
+   - Leverages existing Salesforce Mobile SDK OAuth login
+   - Automatically retrieves JWT token from Salesforce
+   - ❌ **Requires Salesforce Mobile SDK**
+   - **Location:** `examples/Shared/Delegates/CoreDelegate/GlobalCoreDelegateHandler+UserVerification.swift:21-23`
+   - **Implementation:** Lines 32-45 use `AuthHelper.loginIfRequired` from SalesforceSDKCore
+
+### How Passthrough Authentication Works (When Mobile SDK IS Used)
+
+**File:** `examples/Shared/Delegates/CoreDelegate/GlobalCoreDelegateHandler+UserVerification.swift`
+
+```swift
+// Line 22-23: Passthrough method
+case .passthrough:
+    await Self.salesforceLogin()  // Uses Salesforce Mobile SDK
+    return await Self.fetchMIAWJWT(core)
+
+// Lines 38-44: Calls Salesforce Mobile SDK login
+AuthHelper.loginIfRequired {
+    // User authenticated via Salesforce OAuth
+}
+
+// Lines 47-70: Fetches messaging JWT using Salesforce credentials
+let request = RestRequest(method: .GET,
+                         path: core.salesforceAuthenticationRequestPath)
+```
+
+**Passthrough flow:**
+1. User logs into Salesforce using Mobile SDK OAuth (standard Salesforce login screen)
+2. App uses Salesforce session to call messaging authentication endpoint
+3. Salesforce returns messaging-specific JWT token
+4. Messaging SDK uses that JWT for conversations
+
+### Package Dependencies in the Examples
+
+**MessagingCoreExample** (Minimal):
+```
+Dependencies:
+├── SMIClientCore (required)
+└── [No Salesforce Mobile SDK]
+```
+
+**MessagingUIExample** (Includes Optional Mobile SDK):
+```
+Dependencies:
+├── SMIClientCore (required)
+├── SMIClientUI (required)
+└── SalesforceMobileSDK-iOS-SPM (optional - only for Passthrough auth)
+    ├── SalesforceSDKCore
+    ├── MobileSync
+    └── SalesforceAnalytics
+```
+
+### Key Architectural Insight
+
+**The Messaging SDK is NOT built on top of Salesforce Mobile SDK.**
+
+They are separate SDKs that can optionally work together:
+
+```
+Your App
+├── Messaging SDK (SMIClientCore/UI) - STANDALONE
+│   └── Works independently for messaging
+└── Salesforce Mobile SDK (optional)
+    └── Only used if you choose Passthrough authentication
+```
+
+### When Should You Use Each SDK?
+
+| Scenario | Use Messaging SDK | Use Mobile SDK |
+|----------|-------------------|----------------|
+| **Just want messaging/chat** | ✅ Yes (standalone) | ❌ Not needed |
+| **App already uses Salesforce Mobile SDK** | ✅ Yes | ✅ Yes (use Passthrough auth) |
+| **Need Salesforce data sync, offline, platform features** | Optional | ✅ Yes (primary SDK) |
+| **Custom authentication (your own JWT)** | ✅ Yes | ❌ Not needed |
+| **No user authentication needed** | ✅ Yes (Unverified mode) | ❌ Not needed |
+
+### Practical Examples
+
+**Scenario 1: Messaging-Only App (No Mobile SDK)**
+```swift
+// Just messaging, no Salesforce platform features
+import SMIClientUI
+import SMIClientCore
+
+let config = Configuration(...)
+config.userVerificationRequired = false  // Unverified mode
+
+let uiConfig = UIConfiguration(configuration: config, ...)
+Interface(uiConfig, ...)  // Works without Mobile SDK
+```
+
+**Scenario 2: App Already Using Salesforce Mobile SDK**
+```swift
+// Leverage existing Mobile SDK authentication
+import SMIClientUI
+import SMIClientCore
+import SalesforceSDKCore  // Already in your app
+
+// Use Passthrough to share Salesforce login
+let config = Configuration(...)
+config.userVerificationRequired = true
+
+// UserVerificationDelegate uses Mobile SDK's AuthHelper
+// See: GlobalCoreDelegateHandler+UserVerification.swift
+```
+
+### Bottom Line
+
+- **Messaging SDK = Standalone messaging/chat SDK**
+- **Salesforce Mobile SDK = Full Salesforce platform SDK**
+- They are **separate products** that can optionally integrate
+- You can use Messaging SDK **without** ever touching Salesforce Mobile SDK
+- If you already use Mobile SDK, you can integrate via Passthrough authentication
+
+This is different from Salesforce's traditional approach where mobile features required the Mobile SDK. The Messaging SDK is purpose-built for messaging and can be used independently.
+
+---
+
 ## How do I persist conversation sessions across app restarts?
 
 The conversation UUID must be persisted to maintain session continuity:
@@ -435,3 +592,37 @@ Instead of building from scratch, you're adapting proven code that demonstrates 
 - Example passthrough auth: `examples/Shared/Delegates/Providers/PassthroughVerificationStore.swift`
 - WKWebView integration: Apple's [WKWebView documentation](https://developer.apple.com/documentation/webkit/wkwebview)
 - Conversation persistence: `examples/Shared/Settings/Models/ConversationManagement.swift`
+
+Q: When it comes to building a mobile app for Salesforce, I’m aware of the Salesforce Mobile SDK and have always understood that mobile apps are built using that SDK. However, when I look at the sample code provided here, I’m unclear whether it uses the Salesforce Mobile SDK, is built on top of the Mobile SDK, or represents a different or newer approach altogether.
+
+Based on the source code provided, the `MessagingUIExample` app **does use the Salesforce Mobile SDK**, but it treats it as a complementary library rather than the sole foundation.
+
+Here is the breakdown of how the sample code utilizes these SDKs:
+
+### 1. It Uses Two Distinct SDKs
+The sample application integrates two separate SDK packages that work side-by-side:
+
+*   **Messaging for In-App SDK (`SMIClientUI`, `SMIClientCore`):** This is the newer, specialized SDK responsible for the "Advanced Messaging" features, chat feed UI, and the session persistence you are interested in.
+*   **Salesforce Mobile SDK (`SalesforceSDKCore`, `MobileSync`, etc.):** This is the traditional SDK you are familiar with. The sample app includes it as a dependency to handle authentication and identity,.
+
+### 2. Evidence of Salesforce Mobile SDK Usage
+The `MessagingUIExample` is explicitly built with the Salesforce Mobile SDK included in its project dependencies.
+
+*   **Project Dependencies:** The project file (`project.pbxproj`) lists `SalesforceMobileSDK-iOS-SPM` as a remote package dependency. It specifically links frameworks such as `SalesforceSDKCore`, `SalesforceSDKCommon`, and `SalesforceAnalytics`.
+*   **Code Imports:** Several critical files in the sample code import `SalesforceSDKCore` alongside the messaging libraries. For example, `GlobalCoreDelegateHandler.swift` imports both `SMIClientCore` and `SalesforceSDKCore`.
+
+### 3. How the Mobile SDK is Used in the Sample
+In this specific sample app, the Salesforce Mobile SDK is used primarily for **User Verification (Authentication)**.
+
+*   **Login Logic:** The app uses the Mobile SDK's `AuthHelper` to handle logging into Salesforce.
+    *   *Source Evidence:* In `GlobalCoreDelegateHandler+UserVerification.swift`, the code calls `AuthHelper.loginIfRequired` to authenticate the user against your Salesforce Org.
+*   **Token Retrieval:** It uses the Mobile SDK's `RestClient` to make authenticated API calls to fetch the JSON Web Tokens (JWT) required to verify the user's identity in the messaging session.
+    *   *Source Evidence:* The function `fetchMIAWJWT` uses `RestClient.shared.send(request: request)` to retrieve the access token.
+*   **Session Management:** The settings menu includes a button to logout using `UserAccountManager.shared.logout()`, which is a standard Salesforce Mobile SDK method.
+
+### Summary for Your Implementation
+You are not abandoning the Salesforce Mobile SDK approach. Instead, this sample demonstrates a **hybrid approach**:
+
+1.  **Salesforce Mobile SDK:** Handles the "plumbing" of logging the user in and managing their Salesforce credentials.
+2.  **Messaging for In-App SDK:** Handles the actual chat interface, message history, and the network resilience features you need to fix your connectivity issues.
+
