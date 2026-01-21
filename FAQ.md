@@ -105,7 +105,7 @@ However, for the specific problem of sessions being dropped during intermittent 
 - **Purpose**: Salesforce platform integration, OAuth authentication, data sync
 - **Used for**: Passthrough authentication only (in these examples)
 
-### Three Authentication Methods (Only One Uses Mobile SDK)
+### Three Authentication Methods
 
 The Messaging SDK supports three authentication approaches:
 
@@ -114,20 +114,54 @@ The Messaging SDK supports three authentication approaches:
 1. **Unverified** - No authentication
    - Simplest approach
    - No user identity verification
+   - **Use case:** Public messaging, anonymous support
    - ✅ **No Salesforce Mobile SDK required**
 
 2. **User Verified (JWT)** - Your app provides a JWT token
    - You implement JWT generation in your backend
    - Pass token via `UserVerificationDelegate`
+   - **Use case:** Users with non-Salesforce accounts (your own auth system)
+   - **Example:** Retail app where customers have company accounts, not Salesforce credentials
    - ✅ **No Salesforce Mobile SDK required**
    - **Location:** `examples/Shared/Delegates/CoreDelegate/GlobalCoreDelegateHandler+UserVerification.swift:18-19`
 
 3. **Passthrough** - Uses Salesforce Mobile SDK for authentication
-   - Leverages existing Salesforce Mobile SDK OAuth login
+   - Leverages Salesforce Mobile SDK OAuth login
    - Automatically retrieves JWT token from Salesforce
+   - **Use case:** Users with Salesforce credentials (including Experience Cloud users)
+   - **Example:** Experience Cloud site users who log in with Salesforce credentials
    - ❌ **Requires Salesforce Mobile SDK**
    - **Location:** `examples/Shared/Delegates/CoreDelegate/GlobalCoreDelegateHandler+UserVerification.swift:21-23`
    - **Implementation:** Lines 32-45 use `AuthHelper.loginIfRequired` from SalesforceSDKCore
+
+### IMPORTANT: For Experience Cloud Users
+
+**If your users are Experience Cloud users who authenticate with Salesforce credentials, you MUST use Passthrough authentication, which means you NEED both SDKs:**
+
+- ✅ **Messaging SDK** (SMIClientCore/UI) - For messaging functionality
+- ✅ **Salesforce Mobile SDK** (SalesforceSDKCore) - For authentication
+
+**Why:**
+- Your users have **Salesforce Experience Cloud accounts**
+- They authenticate using **Salesforce OAuth** (same credentials as your Experience Cloud site)
+- Passthrough authentication provides single sign-on experience
+- Mobile SDK handles Salesforce OAuth properly
+
+**Configuration for Experience Cloud:**
+```swift
+import SMIClientCore
+import SMIClientUI
+import SalesforceSDKCore  // Required for Experience Cloud users
+
+let config = Configuration(...)
+config.userVerificationRequired = true  // Enable authentication
+
+// Set authorization method to Passthrough
+authorizationMethod = .passthrough
+
+// UserVerificationDelegate will use Mobile SDK's AuthHelper
+// See: GlobalCoreDelegateHandler+UserVerification.swift:21-23
+```
 
 ### How Passthrough Authentication Works (When Mobile SDK IS Used)
 
@@ -191,19 +225,62 @@ Your App
 
 ### When Should You Use Each SDK?
 
-| Scenario | Use Messaging SDK | Use Mobile SDK |
-|----------|-------------------|----------------|
-| **Just want messaging/chat** | ✅ Yes (standalone) | ❌ Not needed |
-| **App already uses Salesforce Mobile SDK** | ✅ Yes | ✅ Yes (use Passthrough auth) |
-| **Need Salesforce data sync, offline, platform features** | Optional | ✅ Yes (primary SDK) |
-| **Custom authentication (your own JWT)** | ✅ Yes | ❌ Not needed |
-| **No user authentication needed** | ✅ Yes (Unverified mode) | ❌ Not needed |
+| Scenario | Use Messaging SDK | Use Mobile SDK | Auth Method |
+|----------|-------------------|----------------|-------------|
+| **Experience Cloud users (Salesforce credentials)** | ✅ Yes | ✅ Yes (REQUIRED) | Passthrough |
+| **App already uses Salesforce Mobile SDK** | ✅ Yes | ✅ Yes | Passthrough |
+| **Users have Salesforce accounts** | ✅ Yes | ✅ Yes (REQUIRED) | Passthrough |
+| **Users have non-Salesforce accounts (your own auth)** | ✅ Yes | ❌ Not needed | JWT |
+| **No user authentication needed** | ✅ Yes | ❌ Not needed | Unverified |
+| **Need Salesforce data sync, offline, platform features** | Optional | ✅ Yes | Passthrough |
 
 ### Practical Examples
 
-**Scenario 1: Messaging-Only App (No Mobile SDK)**
+**Scenario 1: Experience Cloud Native App (REQUIRES BOTH SDKs)**
 ```swift
-// Just messaging, no Salesforce platform features
+// Your users are Experience Cloud users with Salesforce credentials
+import SMIClientUI
+import SMIClientCore
+import SalesforceSDKCore  // REQUIRED for Salesforce authentication
+
+let config = Configuration(...)
+config.userVerificationRequired = true  // Authentication required
+
+// Use Passthrough authentication
+authorizationMethod = .passthrough
+
+// UserVerificationDelegate uses Mobile SDK's AuthHelper
+// When user taps chat, they'll use Salesforce OAuth login
+// Same credentials as they use for Experience Cloud site
+// See: GlobalCoreDelegateHandler+UserVerification.swift:21-23
+```
+
+**Scenario 2: Customer Service App with Non-Salesforce Users (NO Mobile SDK)**
+```swift
+// Your users have accounts in YOUR system, not Salesforce
+// Example: Retail customers with company accounts
+import SMIClientUI
+import SMIClientCore
+// NO SalesforceSDKCore import
+
+let config = Configuration(...)
+config.userVerificationRequired = true
+
+// Implement UserVerificationDelegate to provide JWT
+func core(_ core: CoreClient,
+          userVerificationChallengeWith reason: ChallengeReason) async -> UserVerification? {
+
+    // Call YOUR backend to generate JWT for this user
+    let jwt = await YourBackend.generateMessagingJWT(customerId: currentUser.id)
+
+    return UserVerification(customerIdentityToken: jwt, type: .JWT)
+}
+// See: GlobalCoreDelegateHandler+UserVerification.swift:18-19
+```
+
+**Scenario 3: Anonymous Messaging (NO Mobile SDK)**
+```swift
+// Public messaging, no authentication
 import SMIClientUI
 import SMIClientCore
 
@@ -214,30 +291,59 @@ let uiConfig = UIConfiguration(configuration: config, ...)
 Interface(uiConfig, ...)  // Works without Mobile SDK
 ```
 
-**Scenario 2: App Already Using Salesforce Mobile SDK**
-```swift
-// Leverage existing Mobile SDK authentication
-import SMIClientUI
-import SMIClientCore
-import SalesforceSDKCore  // Already in your app
-
-// Use Passthrough to share Salesforce login
-let config = Configuration(...)
-config.userVerificationRequired = true
-
-// UserVerificationDelegate uses Mobile SDK's AuthHelper
-// See: GlobalCoreDelegateHandler+UserVerification.swift
-```
-
 ### Bottom Line
 
 - **Messaging SDK = Standalone messaging/chat SDK**
-- **Salesforce Mobile SDK = Full Salesforce platform SDK**
+- **Salesforce Mobile SDK = Authentication SDK for Salesforce users**
 - They are **separate products** that can optionally integrate
-- You can use Messaging SDK **without** ever touching Salesforce Mobile SDK
-- If you already use Mobile SDK, you can integrate via Passthrough authentication
+- **If your users have Salesforce credentials (including Experience Cloud):** You NEED both SDKs
+- **If your users have non-Salesforce accounts (your own auth):** You only need Messaging SDK
+- **If no authentication needed:** You only need Messaging SDK
 
-This is different from Salesforce's traditional approach where mobile features required the Mobile SDK. The Messaging SDK is purpose-built for messaging and can be used independently.
+### Decision Tree: Do I Need Mobile SDK?
+
+```
+Do your users log in with Salesforce credentials?
+├─ YES (Experience Cloud, Salesforce users)
+│  └─ ✅ Need BOTH: Messaging SDK + Mobile SDK (Passthrough auth)
+│
+└─ NO (Your own auth system, or no auth)
+   └─ ✅ Need ONLY: Messaging SDK (JWT or Unverified)
+```
+
+This is different from Salesforce's traditional approach where mobile features required the Mobile SDK. The Messaging SDK is purpose-built for messaging and can work independently OR with Mobile SDK depending on your authentication requirements.
+
+### For Your Experience Cloud + UIKitMIAW.swift App
+
+Based on your scenario (Experience Cloud users with Salesforce credentials):
+
+**Required Dependencies:**
+```
+Your Custom Native App (built from UIKitMIAW.swift)
+├── SMIClientCore ✅ REQUIRED (messaging core)
+├── SMIClientUI ✅ REQUIRED (messaging UI)
+└── SalesforceMobileSDK-iOS-SPM ✅ REQUIRED (authentication)
+    ├── SalesforceSDKCore (OAuth login)
+    ├── MobileSync (optional - can exclude if not needed)
+    └── SalesforceAnalytics (optional - can exclude if not needed)
+```
+
+**User Flow:**
+1. User launches your custom app
+2. **Salesforce Mobile SDK OAuth login** (SalesforceSDKCore)
+   - User enters their Experience Cloud credentials
+   - Same Salesforce login as web
+3. App loads Experience Cloud site in WKWebView (UIKitMIAW.swift pattern)
+4. Native chat button overlaid on web content
+5. User taps chat → Messaging SDK launches
+   - **Uses Passthrough authentication**
+   - Messaging SDK leverages the Mobile SDK session
+   - No second login required
+
+**Implementation Reference:**
+- Auth configuration: `examples/Shared/Enums/AuthorizationMethod.swift` → `.passthrough`
+- Auth implementation: `examples/Shared/Delegates/CoreDelegate/GlobalCoreDelegateHandler+UserVerification.swift:21-45`
+- UIKitMIAW pattern: `examples/MessagingUIExample/Views/UIKitMIAW.swift`
 
 ---
 
